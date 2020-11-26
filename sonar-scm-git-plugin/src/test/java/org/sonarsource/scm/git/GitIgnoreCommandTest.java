@@ -25,15 +25,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Arrays;
+import java.util.Collections;
+
 import org.eclipse.jgit.api.Git;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.sonar.api.config.Configuration;
 import org.sonar.api.utils.log.LogTester;
 import org.sonar.api.utils.log.LoggerLevel;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.sonarsource.scm.git.Utils.javaUnzip;
 
 public class GitIgnoreCommandTest {
@@ -50,7 +53,7 @@ public class GitIgnoreCommandTest {
     javaUnzip(new File("test-repos/ignore-git.zip"), projectDir.toFile());
 
     Path baseDir = projectDir.resolve("ignore-git");
-    GitIgnoreCommand underTest = new GitIgnoreCommand();
+    GitIgnoreCommand underTest = new GitIgnoreCommand(mock(Configuration.class));
     underTest.init(baseDir);
 
     assertThat(underTest.isIgnored(baseDir.resolve(".gitignore"))).isFalse();
@@ -68,14 +71,14 @@ public class GitIgnoreCommandTest {
     Path projectDir = temp.newFolder().toPath();
     Git.init().setDirectory(projectDir.toFile()).call();
 
-    Files.write(projectDir.resolve(".gitignore"), Arrays.asList("**/*.java"), StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+    Files.write(projectDir.resolve(".gitignore"), Collections.singletonList("**/*.java"), StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
     int child_folders_per_folder = 2;
     int folder_depth = 10;
     createDeepFolderStructure(projectDir, child_folders_per_folder, 0, folder_depth);
 
     logTester.setLevel(LoggerLevel.DEBUG);
 
-    GitIgnoreCommand underTest = new GitIgnoreCommand();
+    GitIgnoreCommand underTest = new GitIgnoreCommand(mock(Configuration.class));
     underTest.init(projectDir);
 
     assertThat(underTest
@@ -94,14 +97,14 @@ public class GitIgnoreCommandTest {
     Path repoRoot = temp.newFolder().toPath();
     Git.init().setDirectory(repoRoot.toFile()).call();
 
-    Files.write(repoRoot.resolve(".gitignore"), Arrays.asList("**/*.java"), StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+    Files.write(repoRoot.resolve(".gitignore"), Collections.singletonList("**/*.java"), StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
     int child_folders_per_folder = 2;
     int folder_depth = 10;
     createDeepFolderStructure(repoRoot, child_folders_per_folder, 0, folder_depth);
 
     logTester.setLevel(LoggerLevel.DEBUG);
 
-    GitIgnoreCommand underTest = new GitIgnoreCommand();
+    GitIgnoreCommand underTest = new GitIgnoreCommand(mock(Configuration.class));
     // Define project baseDir as folder_0_0 so that folder_0_1 is excluded
     Path projectBasedir = repoRoot.resolve("folder_0_0");
     underTest.init(projectBasedir);
