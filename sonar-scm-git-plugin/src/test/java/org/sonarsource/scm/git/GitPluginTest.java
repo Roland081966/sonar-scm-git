@@ -33,7 +33,7 @@ public class GitPluginTest {
     SonarRuntime runtime = mock(SonarRuntime.class);
     Plugin.Context context = new Plugin.Context(runtime);
     new GitPlugin().define(context);
-    assertThat(context.getExtensions()).hasSize(3);
+    assertThat(context.getExtensions()).hasSize(4);
   }
 
 }
