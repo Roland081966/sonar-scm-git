@@ -66,9 +66,7 @@
 
     <!-- Release: enable publication to Bintray -->
     <artifactsToPublish>${project.groupId}:sonar-scm-git-plugin:jar</artifactsToPublish>
-  </properties>
   
-  <properties>
     <sonar.projectKey>mirolima.de:sonar-scm-git</sonar.projectKey>
     <sonar.organization>rm-softworks</sonar.organization>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
