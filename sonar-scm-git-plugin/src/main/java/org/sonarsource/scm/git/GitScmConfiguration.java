@@ -51,7 +51,7 @@ public class GitScmConfiguration {
         throw new IllegalStateException("Utility class");
     }
 
-    public static  List<PropertyDefinition> getConfiguration() {
+    public static List<PropertyDefinition> getConfiguration() {
         return PROPERTY_DEFINITIONS;
     }
 

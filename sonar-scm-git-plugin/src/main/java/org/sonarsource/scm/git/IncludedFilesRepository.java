@@ -62,12 +62,12 @@ public class IncludedFilesRepository {
 
                 LOG.debug("Trying to index files in submodules");
 
-                for (String submodule: git.submoduleStatus().call().keySet()) {
+                for (String submodule : git.submoduleStatus().call().keySet()) {
 
                     LOG.debug("Collecting files in {}", submodule);
 
                     Repository submoduleRepository = SubmoduleWalk.getSubmoduleRepository(repository, submodule);
-                    if ( submoduleRepository != null) {
+                    if (submoduleRepository != null) {
                         getFilesInRepo(submoduleRepository.getWorkTree().toPath(), submoduleRepository);
                     } else {
                         LOG.info("Submodule {} given, failed to get submodule repository, is it not checked out?", submodule);

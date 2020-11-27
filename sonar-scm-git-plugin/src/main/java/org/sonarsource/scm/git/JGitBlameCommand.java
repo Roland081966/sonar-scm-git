@@ -28,6 +28,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.blame.BlameResult;
@@ -84,16 +85,16 @@ public class JGitBlameCommand extends BlameCommand {
             if (!git.submoduleStatus().call().isEmpty() && analyseSubmodules) {
 
                 LOG.debug("Collecting blame information from submodules");
-                LOG.debug("Submodules available {}" ,git.submoduleStatus().call().toString());
+                LOG.debug("Submodules available {}", git.submoduleStatus().call().toString());
 
                 ForkJoinPool subModulesForkPool = new ForkJoinPool(Runtime.getRuntime().availableProcessors(), new GitThreadFactory(), null, false);
 
-                for (String submodule: git.submoduleStatus().call().keySet()) {
+                for (String submodule : git.submoduleStatus().call().keySet()) {
 
                     LOG.debug("Trying to collect blame information from submodule {}", submodule);
 
                     Repository submoduleRepository = SubmoduleWalk.getSubmoduleRepository(repository, submodule);
-                    if ( submoduleRepository != null && submoduleRepository.getWorkTree() != null) {
+                    if (submoduleRepository != null) {
 
                         Git subModuleGit = Git.wrap(submoduleRepository);
                         File subModuleWorkTree = submoduleRepository.getWorkTree();
@@ -144,7 +145,7 @@ public class JGitBlameCommand extends BlameCommand {
     private void blame(BlameOutput output, Git git, File gitBaseDir, DefaultInputFile inputFile) {
 
         String filename = pathResolver.relativePath(gitBaseDir, inputFile.file());
-        if ( filename == null) {
+        if (filename == null) {
             LOG.debug("Unable to blame file {}, not found under base directory {}", inputFile.getModuleRelativePath(), gitBaseDir.getAbsolutePath());
             return;
         }
