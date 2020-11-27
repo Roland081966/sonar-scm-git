@@ -79,12 +79,7 @@ public class JGitBlameCommand extends BlameCommand {
 
             forkJoinPool.submit(() -> stream.forEach(inputFile -> blame(output, git, gitBaseDir, (DefaultInputFile) inputFile)));
 
-            try {
-                forkJoinPool.shutdown();
-                forkJoinPool.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                LOG.info("Git blame for root repository interrupted");
-            }
+            waitForPoolShutDown(forkJoinPool, "Git blame for root repository interrupted");
 
             if (!git.submoduleStatus().call().isEmpty() && analyseSubmodules) {
 
@@ -96,24 +91,35 @@ public class JGitBlameCommand extends BlameCommand {
                 for (String submodule: git.submoduleStatus().call().keySet()) {
 
                     LOG.debug("Trying to collect blame information from submodule {}", submodule);
+
                     Repository submoduleRepository = SubmoduleWalk.getSubmoduleRepository(repository, submodule);
-                    Git subModuleGit = Git.wrap(submoduleRepository);
-                    File subModuleWorkTree = submoduleRepository.getWorkTree();
+                    if ( submoduleRepository != null && submoduleRepository.getWorkTree() != null) {
 
-                    Stream<InputFile> submoduleStream = StreamSupport.stream(input.filesToBlame().spliterator(), true);
-                    submoduleStream.forEach(inputFile -> blame(output, subModuleGit, subModuleWorkTree, (DefaultInputFile) inputFile));
-                    subModulesForkPool.submit(() -> submoduleStream.forEach(inputFile -> blame(output, subModuleGit, subModuleWorkTree, (DefaultInputFile) inputFile)));
+                        Git subModuleGit = Git.wrap(submoduleRepository);
+                        File subModuleWorkTree = submoduleRepository.getWorkTree();
+
+                        Stream<InputFile> submoduleStream = StreamSupport.stream(input.filesToBlame().spliterator(), true);
+                        submoduleStream.forEach(inputFile -> blame(output, subModuleGit, subModuleWorkTree, (DefaultInputFile) inputFile));
+                        subModulesForkPool.submit(() -> submoduleStream.forEach(inputFile -> blame(output, subModuleGit, subModuleWorkTree, (DefaultInputFile) inputFile)));
+                    } else {
+                        LOG.info("Submodule {} given, {}", submodule, submoduleRepository == null ? "failed to get repository" : "failed to get working tree");
+                    }
                 }
 
-                try {
-                    subModulesForkPool.shutdown();
-                    subModulesForkPool.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
-                } catch (InterruptedException e) {
-                    LOG.info("Git blame for submodules interrupted");
-                }
+                waitForPoolShutDown(subModulesForkPool, "Git blame for submodules interrupted");
             }
         } catch (GitAPIException | IOException e) {
-            e.printStackTrace();
+            LOG.error("Failed to access repository when collecting blame information", e);
+        }
+    }
+
+    private void waitForPoolShutDown(ForkJoinPool forkJoinPool, String s) {
+        try {
+            forkJoinPool.shutdown();
+            forkJoinPool.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            LOG.info(s);
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -139,6 +145,7 @@ public class JGitBlameCommand extends BlameCommand {
 
         String filename = pathResolver.relativePath(gitBaseDir, inputFile.file());
         if ( filename == null) {
+            LOG.debug("Unable to blame file {}, not found under base directory {}", inputFile.getModuleRelativePath(), gitBaseDir.getAbsolutePath());
             return;
         }
 

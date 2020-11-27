@@ -33,6 +33,6 @@ public final class GitPlugin implements Plugin {
                 JGitBlameCommand.class,
                 GitScmProvider.class,
                 GitIgnoreCommand.class);
-        context.addExtensions(GitScmConfiguration.GetConfiguration());
+        context.addExtensions(GitScmConfiguration.getConfiguration());
     }
 }

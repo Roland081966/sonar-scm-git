@@ -67,11 +67,15 @@ public class IncludedFilesRepository {
                     LOG.debug("Collecting files in {}", submodule);
 
                     Repository submoduleRepository = SubmoduleWalk.getSubmoduleRepository(repository, submodule);
-                    getFilesInRepo(submoduleRepository.getWorkTree().toPath(), submoduleRepository);
+                    if ( submoduleRepository != null && submoduleRepository.getWorkTree() != null) {
+                        getFilesInRepo(submoduleRepository.getWorkTree().toPath(), submoduleRepository);
+                    } else {
+                        LOG.info("Submodule {} given, {}", submodule, submoduleRepository == null ? "failed to get repository" : "failed to get working tree");
+                    }
                 }
             }
         } catch (GitAPIException e) {
-            e.printStackTrace();
+            LOG.error("Failed to access repository when collecting files", e);
         }
     }
 

@@ -39,6 +39,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.DiffCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -49,9 +51,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.sonar.api.internal.google.common.collect.ImmutableMap;
@@ -103,7 +103,7 @@ public class GitScmProviderTest {
     + "The door of all subtleties!";
 
   @Rule
-  public TemporaryFolder temp = new TemporaryFolder();
+  public TemporaryFolder temp = TemporaryFolder.builder().assureDeletion().build();
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -468,14 +468,16 @@ public class GitScmProviderTest {
     createAndCommitFile("file-b1");
 
     Path worktree2 = temp.newFolder().toPath();
-    Git.cloneRepository()
-      .setURI(worktree.toString())
-      .setDirectory(worktree2.toFile())
-      .call();
+    Git cloned = Git.cloneRepository()
+            .setURI(worktree.toString())
+            .setDirectory(worktree2.toFile())
+            .call();
 
     assertThat(newScmProvider().branchChangedFiles("master", worktree2))
       .containsOnly(worktree2.resolve("file-b1"));
     verifyZeroInteractions(analysisWarnings);
+
+    cloned.close();
   }
 
   @Test
@@ -497,6 +499,7 @@ public class GitScmProviderTest {
     assertThat(newScmProvider().branchChangedFiles("master", worktree2))
       .containsOnly(worktree2.resolve("file-b1"));
     verifyZeroInteractions(analysisWarnings);
+    local.close();
   }
 
   @Test
@@ -517,6 +520,8 @@ public class GitScmProviderTest {
     assertThat(newScmProvider().branchChangedFiles("local-only", worktree2))
       .containsOnly(worktree2.resolve("file-b1"));
     verifyZeroInteractions(analysisWarnings);
+
+    local.close();
   }
 
   @Test
@@ -526,16 +531,17 @@ public class GitScmProviderTest {
     createAndCommitFile("file-b1");
 
     Path worktree2 = temp.newFolder().toPath();
-    Git.cloneRepository()
-      .setURI(worktree.toString())
-      .setRemote("upstream")
-      .setDirectory(worktree2.toFile())
-      .call();
+    Git cloned = Git.cloneRepository()
+            .setURI(worktree.toString())
+            .setRemote("upstream")
+            .setDirectory(worktree2.toFile())
+            .call();
 
     assertThat(newScmProvider().branchChangedFiles("master", worktree2))
       .containsOnly(worktree2.resolve("file-b1"));
     verifyZeroInteractions(analysisWarnings);
 
+    cloned.close();
   }
 
   @Test

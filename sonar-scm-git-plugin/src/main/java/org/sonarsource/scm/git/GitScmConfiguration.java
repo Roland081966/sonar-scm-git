@@ -27,6 +27,7 @@ import org.sonar.api.resources.Qualifiers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class GitScmConfiguration {
 
@@ -46,16 +47,17 @@ public class GitScmConfiguration {
                 .build());
     }
 
-    public static  List<PropertyDefinition> GetConfiguration() {
+    private GitScmConfiguration() {
+        throw new IllegalStateException("Utility class");
+    }
+
+    public static  List<PropertyDefinition> getConfiguration() {
         return PROPERTY_DEFINITIONS;
     }
 
     public static boolean subModuleAnalysisEnabled(Configuration configuration) {
 
-        if( configuration.get(GitScmConfiguration.INCLUDE_SCM_SUBMODULES).isPresent()) {
-            return Boolean.parseBoolean(configuration.get(GitScmConfiguration.INCLUDE_SCM_SUBMODULES).get());
-        }
-
-        return false;
+        Optional<String> parameter = configuration.get(GitScmConfiguration.INCLUDE_SCM_SUBMODULES);
+        return parameter.filter(Boolean::parseBoolean).isPresent();
     }
 }

@@ -23,17 +23,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
 import org.apache.commons.io.FileUtils;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Repository;
+import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 import org.sonar.api.batch.fs.InputFile;
 import org.sonar.api.batch.fs.internal.DefaultFileSystem;
@@ -51,6 +47,8 @@ import org.sonar.api.utils.System2;
 import org.sonar.api.utils.log.LogTester;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.Mockito.*;
 import static org.sonarsource.scm.git.Utils.javaUnzip;
@@ -60,16 +58,21 @@ public class JGitBlameCommandTest {
   private static final String DUMMY_JAVA = "src/main/java/org/dummy/Dummy.java";
 
   @Rule
-  public TemporaryFolder temp = new TemporaryFolder();
+  public TemporaryFolder temp = TemporaryFolder.builder().assureDeletion().build();
 
   @Rule
   public LogTester logTester = new LogTester();
 
   private final BlameInput input = mock(BlameInput.class);
+  private File projectDir;
+
+  @Before
+  public void setUp() throws Exception {
+    projectDir = temp.newFolder();
+  }
 
   @Test
   public void testBlame() throws IOException {
-    File projectDir = temp.newFolder();
     javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
 
     JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
@@ -111,7 +114,7 @@ public class JGitBlameCommandTest {
 
   @Test
   public void properFailureIfNotAGitProject() throws IOException {
-    File projectDir = temp.newFolder();
+
     javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
 
     JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
@@ -135,7 +138,7 @@ public class JGitBlameCommandTest {
 
   @Test
   public void testBlameOnNestedModule() throws IOException {
-    File projectDir = temp.newFolder();
+
     javaUnzip(new File("test-repos/dummy-git-nested.zip"), projectDir);
 
     JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
@@ -186,58 +189,9 @@ public class JGitBlameCommandTest {
   }
 
   @Test
-  public void dontFailOnModifiedFile() throws IOException {
-    File projectDir = temp.newFolder();
-    javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
-
-    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
-
-    File baseDir = new File(projectDir, "dummy-git");
-    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
-    when(input.fileSystem()).thenReturn(fs);
-    String relativePath = DUMMY_JAVA;
-    DefaultInputFile inputFile = new TestInputFileBuilder("foo", relativePath).build();
-    fs.add(inputFile);
-
-    // Emulate a modification
-    Files.write(baseDir.toPath().resolve(relativePath), "modification and \n some new line".getBytes());
-
-    BlameOutput blameResult = mock(BlameOutput.class);
-
-    when(input.filesToBlame()).thenReturn(Collections.singletonList(inputFile));
-    jGitBlameCommand.blame(input, blameResult);
-  }
-
-  @Test
-  public void dontFailOnNewFile() throws IOException {
-    File projectDir = temp.newFolder();
-    javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
-
-    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
-
-    File baseDir = new File(projectDir, "dummy-git");
-    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
-    when(input.fileSystem()).thenReturn(fs);
-    String relativePath = DUMMY_JAVA;
-    String relativePath2 = "src/main/java/org/dummy/Dummy2.java";
-    DefaultInputFile inputFile = new TestInputFileBuilder("foo", relativePath).build();
-    fs.add(inputFile);
-    DefaultInputFile inputFile2 = new TestInputFileBuilder("foo", relativePath2).build();
-    fs.add(inputFile2);
-
-    // Emulate a new file
-    FileUtils.copyFile(new File(baseDir, relativePath), new File(baseDir, relativePath2));
-
-    BlameOutput blameResult = mock(BlameOutput.class);
-
-    when(input.filesToBlame()).thenReturn(Arrays.asList(inputFile, inputFile2));
-    jGitBlameCommand.blame(input, blameResult);
-  }
-
-  @Test
   public void dontFailOnSymlink() throws IOException {
     assumeTrue(!System2.INSTANCE.isOsWindows());
-    File projectDir = temp.newFolder();
+
     javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
 
     JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
@@ -267,7 +221,7 @@ public class JGitBlameCommandTest {
 
   @Test
   public void return_early_when_shallow_clone_detected() throws IOException {
-    File projectDir = temp.newFolder();
+
     javaUnzip(new File("test-repos/shallow-git.zip"), projectDir);
 
     File baseDir = new File(projectDir, "shallow-git");
@@ -292,7 +246,7 @@ public class JGitBlameCommandTest {
 
   @Test
   public void return_early_when_clone_with_reference_detected() throws IOException {
-    File projectDir = temp.newFolder();
+
     javaUnzip(new File("test-repos/dummy-git-reference-clone.zip"), projectDir);
 
     Path baseDir = projectDir.toPath().resolve("dummy-git2");
@@ -319,8 +273,8 @@ public class JGitBlameCommandTest {
   }
 
   @Test
-  public void testBlameSubmodules() throws IOException {
-    File projectDir = temp.newFolder();
+  public void shouldRetrieveBlameInformationWhenFileIsPartOfSubModule() throws IOException {
+
     javaUnzip(new File("test-repos/submodule-git.zip"), projectDir);
 
     JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
@@ -335,8 +289,10 @@ public class JGitBlameCommandTest {
 
     GitIgnoreCommand ignoreCommand = new GitIgnoreCommand(mock(Configuration.class));
     ignoreCommand.init(baseDir.toPath());
+
     BlameOutput blameResult = mock(BlameOutput.class);
     when(input.filesToBlame()).thenReturn(Collections.singletonList(inputFile));
+
     jGitBlameCommand.blame(input, blameResult);
 
     String author = "email@example.com";
@@ -350,8 +306,8 @@ public class JGitBlameCommandTest {
   }
 
   @Test
-  public void shouldNothaveBlameInformationWhenSubmoduleBlamingIsDisabled() throws IOException {
-    File projectDir = temp.newFolder();
+  public void shouldNotHaveBlameInformationWhenSubmoduleBlamingIsDisabled() throws IOException {
+
     javaUnzip(new File("test-repos/submodule-git.zip"), projectDir);
 
     JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("false");
@@ -366,11 +322,200 @@ public class JGitBlameCommandTest {
 
     GitIgnoreCommand ignoreCommand = new GitIgnoreCommand(mock(Configuration.class));
     ignoreCommand.init(baseDir.toPath());
+
     BlameOutput blameResult = mock(BlameOutput.class);
     when(input.filesToBlame()).thenReturn(Collections.singletonList(inputFile));
+
     jGitBlameCommand.blame(input, blameResult);
 
     verify(blameResult, never()).blameResult(inputFile, new LinkedList<>());
+  }
+
+  @Test
+  public void shouldIgnoreSubmodulesWhenNotCheckedOut() throws IOException {
+
+    javaUnzip(new File("test-repos/submodule-git.zip"), projectDir);
+
+    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
+
+    File baseDir = new File(projectDir, "submodule-git");
+
+    FileUtils.deleteDirectory(new File(baseDir, "lib"));
+
+    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
+    when(input.fileSystem()).thenReturn(fs);
+    DefaultInputFile inputFile = new TestInputFileBuilder("foo", "lib/file")
+            .setModuleBaseDir(baseDir.toPath())
+            .build();
+    fs.add(inputFile);
+
+    GitIgnoreCommand ignoreCommand = new GitIgnoreCommand(mock(Configuration.class));
+    ignoreCommand.init(baseDir.toPath());
+
+    BlameOutput blameResult = mock(BlameOutput.class);
+    when(input.filesToBlame()).thenReturn(Collections.singletonList(inputFile));
+
+    jGitBlameCommand.blame(input, blameResult);
+
+    List<BlameLine> expectedBlame = new LinkedList<>();
+    verify(blameResult, never()).blameResult(inputFile, expectedBlame);
+  }
+
+  @Test
+  public void shouldNotRetrieveBlameInformationWhenFileIsModifiedButNotCommitted() throws IOException {
+
+    javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
+
+    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
+
+    File baseDir = new File(projectDir, "dummy-git");
+    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
+    when(input.fileSystem()).thenReturn(fs);
+    String modifiedFile = "src/main/java/org/dummy/AnotherDummy.java";
+    DefaultInputFile inputFile = new TestInputFileBuilder("foo", modifiedFile)
+            .setModuleBaseDir(baseDir.toPath())
+            .build();
+    fs.add(inputFile);
+
+    // Emulate a modification
+    Files.write(baseDir.toPath().resolve(modifiedFile), "modification and \n some new line".getBytes());
+
+    BlameOutput blameResult = mock(BlameOutput.class);
+
+    when(input.filesToBlame()).thenReturn(Collections.singletonList(inputFile));
+    jGitBlameCommand.blame(input, blameResult);
+    verify(blameResult, never()).blameResult(any(),argThat(List::isEmpty));
+  }
+
+  @Test
+  public void shouldNotRetrieveBlameInformationWhenFileIsAddedButNotCommitted() throws IOException {
+
+    javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
+
+    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
+
+    File baseDir = new File(projectDir, "dummy-git");
+    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
+    when(input.fileSystem()).thenReturn(fs);
+    DefaultInputFile inputFile = new TestInputFileBuilder("foo", DUMMY_JAVA)
+            .setModuleBaseDir(baseDir.toPath())
+            .build();
+    fs.add(inputFile);
+
+    // Emulate file creation
+    Files.write(baseDir.toPath().resolve(DUMMY_JAVA), "modification and \n some new line".getBytes());
+
+    try (Repository repository = JGitUtils.buildRepository(baseDir.toPath()); Git git = Git.wrap(repository)) {
+      git.add().addFilepattern(DUMMY_JAVA).call();
+    } catch ( GitAPIException e) {
+      fail("Failed when adding file to repository");
+    }
+
+    BlameOutput blameResult = mock(BlameOutput.class);
+    when(input.filesToBlame()).thenReturn(Collections.singletonList(inputFile));
+
+    jGitBlameCommand.blame(input, blameResult);
+
+    verify(blameResult, never()).blameResult(any(),argThat(List::isEmpty));
+  }
+
+  @Test
+  public void shouldRetrieveBlameInformationWhenFileIsModifiedAndCommitted() throws IOException {
+
+    javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
+
+    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
+
+    File baseDir = new File(projectDir, "dummy-git");
+    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
+    when(input.fileSystem()).thenReturn(fs);
+    String modifiedFile = "src/main/java/org/dummy/AnotherDummy.java";
+    DefaultInputFile inputFile = new TestInputFileBuilder("foo", modifiedFile)
+            .setModuleBaseDir(baseDir.toPath())
+            .build();
+    fs.add(inputFile);
+
+    // Emulate a modification
+    Files.write(baseDir.toPath().resolve(modifiedFile), "modification and \n some new line".getBytes());
+
+    addAndCommitFile(baseDir, modifiedFile);
+
+    BlameOutput blameResult = mock(BlameOutput.class);
+    when(input.filesToBlame()).thenReturn(Collections.singletonList(inputFile));
+
+    jGitBlameCommand.blame(input, blameResult);
+
+    verify(blameResult).blameResult(any(),argThat(list -> list.size() == 2));
+  }
+
+  @Test
+  public void shouldRetrieveBlameInformationWhenFileIsAddedAndCommitted() throws IOException {
+
+    javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
+
+    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
+
+    File baseDir = new File(projectDir, "dummy-git");
+    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
+    when(input.fileSystem()).thenReturn(fs);
+    DefaultInputFile inputFile = new TestInputFileBuilder("foo", DUMMY_JAVA)
+            .setModuleBaseDir(baseDir.toPath())
+            .build();
+    fs.add(inputFile);
+
+    // Emulate a modification
+    Files.write(baseDir.toPath().resolve(DUMMY_JAVA), "Added new file\n Line 1\nLine 2".getBytes());
+
+    addAndCommitFile(baseDir, DUMMY_JAVA);
+
+    BlameOutput blameResult = mock(BlameOutput.class);
+    when(input.filesToBlame()).thenReturn(Collections.singletonList(inputFile));
+
+    jGitBlameCommand.blame(input, blameResult);
+
+    verify(blameResult).blameResult(any(),argThat(list -> list.size() == 3));
+  }
+
+  @Test
+  public void shouldRetrieveBlameInformationForAllFilesWhenFileIsAddedAndCommitted() throws IOException {
+    javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
+
+    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
+
+    File baseDir = new File(projectDir, "dummy-git");
+    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
+    when(input.fileSystem()).thenReturn(fs);
+    DefaultInputFile newFile = new TestInputFileBuilder("foo", DUMMY_JAVA)
+            .setModuleBaseDir(baseDir.toPath())
+            .build();
+    fs.add(newFile);
+
+    DefaultInputFile existingFile = new TestInputFileBuilder("foo", "src/main/java/org/dummy/AnotherDummy.java")
+            .setModuleBaseDir(baseDir.toPath())
+            .build();
+    fs.add(existingFile);
+
+    // Emulate creation of new file
+    Files.write(baseDir.toPath().resolve(DUMMY_JAVA), "Added new file\n Line 1\nLine 2".getBytes());
+
+    addAndCommitFile(baseDir, DUMMY_JAVA);
+
+    BlameOutput blameResult = mock(BlameOutput.class);
+    when(input.filesToBlame()).thenReturn(Arrays.asList(newFile, existingFile));
+
+    jGitBlameCommand.blame(input, blameResult);
+
+    verify(blameResult).blameResult(eq(newFile),argThat(list -> list.size() == 3));
+    verify(blameResult).blameResult(eq(existingFile),argThat(list -> list.size() == 29));
+  }
+
+  private void addAndCommitFile(File baseDir, String dummyJava) {
+    try (Repository repository = JGitUtils.buildRepository(baseDir.toPath()); Git git = Git.wrap(repository)) {
+      git.add().addFilepattern(dummyJava).call();
+      git.commit().setMessage("Dummy commit").setAuthor("dummy", "dummy@dummy.com").call();
+    } catch (GitAPIException e) {
+      fail("Failed when adding file to repository");
+    }
   }
 
   private JGitBlameCommand newJGitBlameCommand(String submoduleEnabled) {

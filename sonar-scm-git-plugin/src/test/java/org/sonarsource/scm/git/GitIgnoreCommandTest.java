@@ -45,7 +45,7 @@ public class GitIgnoreCommandTest {
   public LogTester logTester = new LogTester();
 
   @Rule
-  public TemporaryFolder temp = new TemporaryFolder();
+  public TemporaryFolder temp = TemporaryFolder.builder().assureDeletion().build();
 
   @Test
   public void ignored_files_should_match_files_ignored_by_git() throws IOException {
