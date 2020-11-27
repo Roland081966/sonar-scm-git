@@ -67,10 +67,10 @@ public class IncludedFilesRepository {
                     LOG.debug("Collecting files in {}", submodule);
 
                     Repository submoduleRepository = SubmoduleWalk.getSubmoduleRepository(repository, submodule);
-                    if ( submoduleRepository != null && submoduleRepository.getWorkTree() != null) {
+                    if ( submoduleRepository != null) {
                         getFilesInRepo(submoduleRepository.getWorkTree().toPath(), submoduleRepository);
                     } else {
-                        LOG.info("Submodule {} given, {}", submodule, submoduleRepository == null ? "failed to get repository" : "failed to get working tree");
+                        LOG.info("Submodule {} given, failed to get submodule repository, is it not checked out?", submodule);
                     }
                 }
             }
