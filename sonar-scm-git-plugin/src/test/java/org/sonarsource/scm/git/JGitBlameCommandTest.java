@@ -45,6 +45,7 @@ import org.sonar.api.utils.DateUtils;
 import org.sonar.api.utils.MessageException;
 import org.sonar.api.utils.System2;
 import org.sonar.api.utils.log.LogTester;
+import org.sonar.api.utils.log.LoggerLevel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
@@ -532,6 +533,31 @@ public class JGitBlameCommandTest {
     jGitBlameCommand.blame(input, blameResult);
 
     verify(blameResult, never()).blameResult(existingFile,new LinkedList<>());
+  }
+
+  @Test
+  public void shouldLogFilesWhenRelativePathCanNotBeEvaluated() throws IOException {
+
+    javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
+
+    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("false");
+
+    File baseDir = new File(projectDir, "dummy-git");
+    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
+    when(input.fileSystem()).thenReturn(fs);
+
+    DefaultInputFile nonExistingFile = new TestInputFileBuilder("foo", "src/main/java/org/dummy/AnotherDummy.java")
+            .build();
+    fs.add(nonExistingFile);
+
+    BlameOutput blameResult = mock(BlameOutput.class);
+    when(input.filesToBlame()).thenReturn(Collections.singletonList(nonExistingFile));
+
+    logTester.setLevel(LoggerLevel.DEBUG);
+
+    jGitBlameCommand.blame(input, blameResult);
+
+    assertThat(logTester.logs(LoggerLevel.DEBUG).get(2)).contains("Unable to blame file src/main/java/org/dummy/AnotherDummy.java, not found under base directory");
   }
 
   private void addAndCommitFile(File baseDir, String dummyJava) {
