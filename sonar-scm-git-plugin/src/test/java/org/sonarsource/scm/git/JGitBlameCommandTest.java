@@ -509,6 +509,31 @@ public class JGitBlameCommandTest {
     verify(blameResult).blameResult(eq(existingFile),argThat(list -> list.size() == 29));
   }
 
+  @Test
+  public void shouldNotRetrieveBlameInformationForADeletedFileThatIsNotCommitted() throws IOException {
+    javaUnzip(new File("test-repos/dummy-git.zip"), projectDir);
+
+    JGitBlameCommand jGitBlameCommand = newJGitBlameCommand("true");
+
+    File baseDir = new File(projectDir, "dummy-git");
+    DefaultFileSystem fs = new DefaultFileSystem(baseDir);
+    when(input.fileSystem()).thenReturn(fs);
+
+    DefaultInputFile existingFile = new TestInputFileBuilder("foo", "src/main/java/org/dummy/AnotherDummy.java")
+            .setModuleBaseDir(baseDir.toPath())
+            .build();
+    fs.add(existingFile);
+
+    FileUtils.forceDelete(new File(baseDir, "src/main/java/org/dummy/AnotherDummy.java"));
+
+    BlameOutput blameResult = mock(BlameOutput.class);
+    when(input.filesToBlame()).thenReturn(Collections.singletonList(existingFile));
+
+    jGitBlameCommand.blame(input, blameResult);
+
+    verify(blameResult, never()).blameResult(existingFile,new LinkedList<>());
+  }
+
   private void addAndCommitFile(File baseDir, String dummyJava) {
     try (Repository repository = JGitUtils.buildRepository(baseDir.toPath()); Git git = Git.wrap(repository)) {
       git.add().addFilepattern(dummyJava).call();
